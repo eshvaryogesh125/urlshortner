@@ -1,10 +1,13 @@
 '''helper functions'''
 import random, string
-import threading
+import threading, os
+from dotenv import load_dotenv
+load_dotenv()
 from time import time
 from models import URL
 
 BASE62 = string.digits + string.ascii_letters
+MACHINE_ID = int(os.getenv("MACHINE_ID", "1"))
 
 def generate_code(length=8):
     chars = string.ascii_letters + string.digits
@@ -21,14 +24,18 @@ def generate_unique_code(db):
             return code
 
 class CodeGeneratorTimestamp:
-    def __init__(self):
+    def __init__(self, machine_id=1):
+        self.machine_id = machine_id
+
         self.sequence = 0
         self.last_timestamp = -1
         self.lock = threading.Lock()
 
         self.sequence_bits = 12
-
-        self.timestamp_shifts = self.sequence_bits
+        self.machine_bits = 10
+        
+        self.machine_id_shift = self.sequence_bits
+        self.timestamp_shifts = self.sequence_bits + self.machine_bits
 
         self.max_sequence = (1 << self.sequence_bits) - 1
 
@@ -50,11 +57,11 @@ class CodeGeneratorTimestamp:
                 self.sequence = 0
 
             self.last_timestamp = timestamp
-            print(f"timestamp: {timestamp}, sequence: {self.sequence}")
-            code = ((timestamp - self.epoch) << self.timestamp_shifts) | self.sequence
+            
+            code = ((timestamp - self.epoch) << self.timestamp_shifts) | (self.machine_id << self.machine_id_shift) | self.sequence
             return code
 
-timestamp_code = CodeGeneratorTimestamp()
+timestamp_code = CodeGeneratorTimestamp(MACHINE_ID)
 
 def encode_base62(num):
     base = 62
