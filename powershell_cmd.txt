@@ -1,0 +1,11 @@
+-- POST/ shorten --
+Invoke-RestMethod `
+-Uri "http://127.0.0.1:8000/shorten" `
+-Method POST `
+-ContentType "application/json" `
+-Body (@{url="https://google.com"} | ConvertTo-Json)
+
+-- GET/ {short_code} --
+Invoke-RestMethod `
+-Uri "http://127.0.0.1:8000/9Q97OE6z" `
+-Method GET
