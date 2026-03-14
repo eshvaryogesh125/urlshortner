@@ -47,6 +47,9 @@ class CodeGeneratorTimestamp:
     def generate_code(self):
         with self.lock:
             timestamp = self._current_timestamp()
+            if timestamp < self.last_timestamp:
+                raise Exception("Clock moved backwards. Refusing to generate code.")
+
             if timestamp == self.last_timestamp:
                 self.sequence = (self.sequence + 1) & self.max_sequence
 
