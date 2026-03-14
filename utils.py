@@ -1,6 +1,10 @@
 '''helper functions'''
 import random, string
+import threading
+from time import time
 from models import URL
+
+BASE62 = string.digits + string.ascii_letters
 
 def generate_code(length=8):
     chars = string.ascii_letters + string.digits
@@ -15,3 +19,54 @@ def generate_unique_code(db):
 
         if not exists:
             return code
+
+class CodeGeneratorTimestamp:
+    def __init__(self):
+        self.sequence = 0
+        self.last_timestamp = -1
+        self.lock = threading.Lock()
+
+        self.sequence_bits = 12
+
+        self.timestamp_shifts = self.sequence_bits
+
+        self.max_sequence = (1 << self.sequence_bits) - 1
+
+        self.epoch = 1700000000000
+
+    def _current_timestamp(self):
+        return int(time() * 1000)
+    
+    def generate_code(self):
+        with self.lock:
+            timestamp = self._current_timestamp()
+            if timestamp == self.last_timestamp:
+                self.sequence = (self.sequence + 1) & self.max_sequence
+
+                if self.sequence == 0:
+                    while timestamp <= self.last_timestamp:
+                        timestamp = self._current_timestamp()
+            else:
+                self.sequence = 0
+
+            self.last_timestamp = timestamp
+            print(f"timestamp: {timestamp}, sequence: {self.sequence}")
+            code = ((timestamp - self.epoch) << self.timestamp_shifts) | self.sequence
+            return code
+
+timestamp_code = CodeGeneratorTimestamp()
+
+def encode_base62(num):
+    base = 62
+    encoded = []
+
+    while num > 0:
+        num, rem = divmod(num, base)
+        encoded.append(BASE62[rem])
+
+    code = ''.join(reversed(encoded))
+    return code
+
+def generate_timestamp_code():
+    code = timestamp_code.generate_code()
+    return encode_base62(code)

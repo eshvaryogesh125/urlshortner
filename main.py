@@ -29,7 +29,7 @@ def get_db():
 @app.post("/shorten")
 def create_short_url(request: schemas.URLRequest, db: Session = Depends(get_db)):
 
-    short_code = utils.generate_unique_code()
+    short_code = utils.generate_timestamp_code()
 
     new_url = models.URL(
         original_url=request.url,
