@@ -1,43 +1,100 @@
 # URL Shortener
 
-A simple URL shortener API built with FastAPI and SQLAlchemy.
+A simple URL shortener API built with FastAPI, SQLAlchemy, and SQLite.
 
 ## Features
 
-- Shorten long URLs to unique short codes.
-- Redirect to original URLs using short codes.
-- Health check endpoint.
+- Create short URLs for long links.
+- Optional custom alias support.
+- Redirect short codes to original URLs.
+- Background click counting for each redirect.
+- Added In-memory caching
+- Rate limiting on creation and redirect endpoints.
+
+## Prerequisites
+
+- Python 3.11+
+- `pip`
+- A `.env` file with:
+  - `DATABASE_URL` (for example: `sqlite:///./urls.db`)
+  - `BASE_URL` (for example: `http://localhost:8000`)
+  - `MACHINE_ID` (optional; defaults to `1`; reserved for future Docker/container deployments)
 
 ## Installation
 
 1. Clone the repository.
-2. Create a virtual environment: `python -m venv venv`
-3. Activate the virtual environment: `venv\Scripts\activate` (Windows) or `source venv/bin/activate` (Unix).
-4. Install dependencies: `pip install fastapi sqlalchemy pydantic uvicorn`
+2. Create a virtual environment:
+   - Windows: `python -m venv venv`
+   - Unix/macOS: `python3 -m venv venv`
+3. Activate the virtual environment:
+   - Windows: `venv\Scripts\activate`
+   - Unix/macOS: `source venv/bin/activate`
+4. Install dependencies:
+   - `pip install fastapi sqlalchemy pydantic uvicorn python-dotenv slowapi`
 
-## Usage
+## Running the app
 
-1. Run the application: `uvicorn main:app --reload`
-2. The API will be available at `http://127.0.0.1:8000`
+1. Start the server:
+   - `uvicorn main:app --reload`
+2. Open the API at:
+   - `http://127.0.0.1:8000`
 
 ## API Endpoints
 
-- **GET /health**: Health check.
-- **POST /shorten**: Shorten a URL. Body: `{"url": "https://example.com"}`. Response: `{"short_url": "http://localhost:8000/ABC123"}`
-- **GET /{short_code}**: Redirect to the original URL.
+### POST /shorten
 
-## Testing
+Create a short URL.
 
-Use the provided PowerShell commands in [powershell_cmd.txt](powershell_cmd.txt) to test the API.
+Request body:
+
+```json
+{
+  "url": "https://example.com",
+  "custom_alias": "myalias"
+}
+```
+
+Response example:
+
+```json
+{
+  "short_url": "http://localhost:8000/myalias"
+}
+```
+
+Notes:
+- `custom_alias` is optional.
+- If the URL already exists, the service returns the existing short URL.
+- Requests are limited to `5/minute` per client.
+
+### GET /{short_code}
+
+Redirects to the original URL for the given short code.
+
+Notes:
+- Redirects use HTTP `302`.
+- Redirect requests are rate limited to `10/minute` per client.
 
 ## Database
 
-Uses SQLite database ([database.py](database.py)). Tables defined in [models.py](models.py).
+- `database.py` configures the SQLAlchemy engine and session.
+- `models.py` defines `URL` and `Click` tables.
+- Click counts are updated asynchronously in `tasks.py`.
 
-## Files
+## Project files
 
-- [main.py](main.py): Main API application.
-- [models.py](models.py): Database models, e.g., [`URL`](models.py).
-- [schemas.py](schemas.py): Pydantic schemas.
-- [utils.py](utils.py): Utility functions, e.g., [`generate_unique_code`](utils.py).
-- [database.py](database.py): Database configuration.
+- `main.py`: FastAPI application and endpoint definitions.
+- `models.py`: SQLAlchemy models for URLs and clicks.
+- `schemas.py`: Pydantic request/response models.
+- `utils.py`: URL generation, cache helpers, and DB helpers.
+- `database.py`: Database connection setup.
+- `tasks.py`: Background task for click count updates.
+- `powershell_cmd.txt`: Example PowerShell commands for testing.
+
+## Notes
+
+- The app builds short URLs using the `BASE_URL` value from `.env`.
+- If `BASE_URL` is not set, it defaults to `http://localhost:8000`.
+- A simple in-memory cache is used for redirect lookups with a 10-minute TTL.
+- Custom aliases must be unique.
+- `MACHINE_ID` is reserved for future Docker/container deployments to support unique short-code generation across instances.

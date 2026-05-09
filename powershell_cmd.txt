@@ -1,11 +1,24 @@
--- POST/ shorten --
-Invoke-RestMethod `
--Uri "http://127.0.0.1:8000/shorten" `
--Method POST `
--ContentType "application/json" `
--Body (@{url="https://google.com"} | ConvertTo-Json)
+# URL Shortener PowerShell Test Commands
 
--- GET/ {short_code} --
+# Create a short URL
 Invoke-RestMethod `
--Uri "http://127.0.0.1:8000/9Q97OE6z" `
--Method GET
+  -Uri "http://127.0.0.1:8000/shorten" `
+  -Method POST `
+  -ContentType "application/json" `
+  -Body (@{url="https://google.com"} | ConvertTo-Json)
+
+# Create a short URL with a custom alias
+Invoke-RestMethod `
+  -Uri "http://127.0.0.1:8000/shorten" `
+  -Method POST `
+  -ContentType "application/json" `
+  -Body (@{url="https://example.com"; custom_alias="myalias"} | ConvertTo-Json)
+
+# Follow a short URL redirect
+Invoke-WebRequest `
+  -Uri "http://127.0.0.1:8000/myalias" `
+  -MaximumRedirection 0 `
+  -UseBasicParsing
+
+# If the redirect succeeds, use a short code returned from the shorten endpoint
+# and open it in your browser or use Invoke-WebRequest with the short code URL.
