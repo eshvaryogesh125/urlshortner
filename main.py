@@ -1,26 +1,24 @@
 '''API'''
 
-from fastapi import FastAPI, Depends, HTTPException,BackgroundTasks
+from fastapi import FastAPI, Depends, HTTPException, BackgroundTasks
 from fastapi.responses import RedirectResponse
 from sqlalchemy.orm import Session
 
 import models
 import schemas
-import utils
 import time
 from database import engine, SessionLocal
 from tasks import updateClickCount
+from utils import *
 
 models.Base.metadata.create_all(bind=engine)
 
 app = FastAPI()
 
-CACHE = {}
-
-@app.get("/health")
-def health_check():
-    print("hola")
-    return {"status":200}
+# @app.get("/health")
+# def health_check():
+#     print("hola")
+#     return {"status":200}
 
 def get_db():
     db = SessionLocal()
@@ -29,29 +27,24 @@ def get_db():
     finally:
         db.close()
 
-@app.post("/shorten")
+@app.post("/shorten", response_model=schemas.URLResponse, status_code=201)
 def create_short_url(request: schemas.URLRequest, db: Session = Depends(get_db)):
 
     existing_url = db.query(models.URL).filter(models.URL.original_url == request.url).first()
     if existing_url:
-        return { "short_url": f"http://localhost:8000/{existing_url.short_code}" }
-        
-    short_code = utils.generate_timestamp_code()
-
-    new_url = models.URL(
-        original_url=request.url,
-        short_code=short_code
-    )
-    db.add(new_url)
-    db.flush() 
+        return schemas.URLResponse(short_url=f"http://localhost:8000/{existing_url.short_code}")
     
-    new_click = models.Click(url_id=new_url.id)
-    db.add(new_click)
-    
-    db.commit()
-    db.refresh(new_url)
+    if request.custom_alias:
+        if not check_short_url_exists(db, request.custom_alias):
+            short_code = request.custom_alias
+        else:
+            raise HTTPException(status_code=400, detail="Custom alias already exists")
+    else:
+        short_code = generate_timestamp_code()
 
-    return {"short_url": f"http://localhost:8000/{short_code}"}
+    create_url_db(db, request.url, short_code)
+
+    return schemas.URLResponse(short_url=f"http://localhost:8000/{short_code}")
 
 @app.get("/{short_code}")
 def redirect(short_code: str, background_tasks: BackgroundTasks, db: Session = Depends(get_db)):
@@ -69,17 +62,3 @@ def redirect(short_code: str, background_tasks: BackgroundTasks, db: Session = D
     background_tasks.add_task(updateClickCount, short_code)
 
     return RedirectResponse(original_url, status_code=302)
-
-def get_cache(short_code):
-    print(f"Checking cache for {short_code}, Current cache state: {CACHE}")
-    if short_code in CACHE:
-        original_url, expiry = CACHE[short_code]
-        if time.time() > expiry:
-            del CACHE[short_code]
-            return None
-        return original_url
-    return None
-
-def set_cache(short_code, original_url, ttl=600):
-    expiry = time.time() + ttl
-    CACHE[short_code] = (original_url, expiry)

@@ -1,9 +1,10 @@
 '''req/resp formats'''
 
-from pydantic import BaseModel
+from pydantic import BaseModel, HttpUrl
 
 class URLRequest(BaseModel):
-    url: str
+    url: HttpUrl
+    custom_alias: str | None = None
 
 class URLResponse(BaseModel):
-    short_url: str
+    short_url: HttpUrl
