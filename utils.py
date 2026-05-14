@@ -7,6 +7,11 @@ import models
 load_dotenv()
 from time import time
 from models import URL
+import redis
+
+redis_client = redis.from_url(
+    os.getenv("REDIS_URL", "redis://localhost:6379")
+)
 
 BASE62 = string.digits + string.ascii_letters
 MACHINE_ID = int(os.getenv("MACHINE_ID", "1"))
@@ -104,16 +109,22 @@ def create_url_db(db, original_url, short_code):
     return new_url
 
 
+# def get_cache(short_code):
+#     print(f"Checking cache for {short_code}, Current cache state: {CACHE}")
+#     if short_code in CACHE:
+#         original_url, expiry = CACHE[short_code]
+#         if time() > expiry:
+#             del CACHE[short_code]
+#             return None
+#         return original_url
+#     return None
+
+# def set_cache(short_code, original_url, ttl=600):
+#     expiry = time() + ttl
+#     CACHE[short_code] = (original_url, expiry)
+
 def get_cache(short_code):
-    print(f"Checking cache for {short_code}, Current cache state: {CACHE}")
-    if short_code in CACHE:
-        original_url, expiry = CACHE[short_code]
-        if time() > expiry:
-            del CACHE[short_code]
-            return None
-        return original_url
-    return None
+    return redis_client.get(short_code).decode('utf-8') if redis_client.get(short_code) else None
 
 def set_cache(short_code, original_url, ttl=600):
-    expiry = time() + ttl
-    CACHE[short_code] = (original_url, expiry)
+    redis_client.setex(short_code, ttl, original_url)

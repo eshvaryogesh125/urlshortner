@@ -1,6 +1,5 @@
 '''API'''
 
-from fastapi import FastAPI, Depends, HTTPException, BackgroundTasks
 from fastapi.responses import RedirectResponse
 from sqlalchemy.orm import Session
 
@@ -21,16 +20,17 @@ from slowapi.errors import RateLimitExceeded
 limiter = Limiter(key_func=get_remote_address)
 load_dotenv()
 BASE_URL = os.getenv("BASE_URL", "http://localhost:8000")
+RESERVED_URL = ["shorten", "health"]
 
 app = FastAPI()
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 models.Base.metadata.create_all(bind=engine)
 
-# @app.get("/health")
-# def health_check():
-#     print("hola")
-#     return {"status":200}
+@app.get("/health")
+def health_check():
+    print("hola")
+    return {"status":200}
 
 def get_db():
     db = SessionLocal()
@@ -55,6 +55,9 @@ def create_short_url(request: Request, url_request: schemas.URLRequest, db: Sess
             raise HTTPException(status_code=400, detail="Custom alias already exists")
     else:
         short_code = generate_timestamp_code()
+
+    if short_code in RESERVED_URL:
+        raise HTTPException(status_code=400, detail="Custom alias is reserved")
 
     create_url_db(db, url_request.url, short_code)
 
